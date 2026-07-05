@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "MoodScaper",
+    "slug": "moodscaper",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.waddefj.moodscaper",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MoodScaper 需要获取您的位置信息，以便为您生成当地的天气氛围主题。",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MoodScaper 需要在后台获取您的位置，以便每天早上自动更新您的天气主题。"
+      }
+    },
+    "android": {
+      "package": "com.waddefj.moodscaper",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sharing",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "MoodScaper 需要在后台获取您的位置，以便每天早上自动更新您的天气主题。",
+          "locationWhenInUsePermission": "MoodScaper 需要获取您的位置信息，以便为您生成当地的天气氛围主题。"
+        }
+      ],
+      [
+        "expo-task-manager",
+        {}
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a50e29e3-ebab-477a-919b-ba8feb04cf1c"
+      }
+    },
+    "privacy": "https://wdvbnm.github.io/moodscaper/privacy.html",
+    "owner": "waddefj"
+  }
+}

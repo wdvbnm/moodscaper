@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoodScaper 图标和启动画面生成器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #5B9BD5, #A78BFA, #FF6B6B);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .subtitle { color: #888; margin-bottom: 40px; font-size: 0.95rem; }
+  .preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+  .preview-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid #2a2a4a;
+  }
+  .preview-card h3 { font-size: 0.85rem; color: #aaa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .preview-card canvas { border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  .label-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.75rem; color: #666; }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    padding: 12px 28px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #5B9BD5, #7B6CF6);
+    color: #fff;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(91,155,213,0.35); }
+  .btn-secondary {
+    background: #2a2a4a;
+    color: #ccc;
+    border: 1px solid #3a3a5a;
+  }
+  .btn-secondary:hover { background: #3a3a5a; }
+  #status { margin-top: 16px; padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; display: none; }
+  #status.success { background: #064e3b; color: #6ee7b7; display: block; }
+  #status.info { background: #1e3a5f; color: #93c5fd; display: block; }
+</style>
+</head>
+<body>
+
+<h1>MoodScaper</h1>
+<p class="subtitle">天气 · 情绪 · 氛围 — 图标和启动画面生成器</p>
+
+<div class="preview-grid">
+  <div class="preview-card">
+    <h3>App 图标</h3>
+    <canvas id="previewIcon" width="256" height="256"></canvas>
+    <div class="label-row"><span>icon.png</span><span>1024×1024</span></div>
+  </div>
+  <div class="preview-card">
+    <h3>启动画面</h3>
+    <canvas id="previewSplash" width="256" height="256"></canvas>
+    <div class="label-row"><span>splash-icon.png</span><span>1284×2778</span></div>
+  </div>
+  <div class="preview-card">
+    <h3>Android 前景</h3>
+    <canvas id="previewForeground" width="256" height="256"></canvas>
+    <div class="label-row"><span>adaptive-foreground</span><span>1024×1024</span></div>
+  </div>
+  <div class="preview-card">
+    <h3>Android 单色</h3>
+    <canvas id="previewMono" width="256" height="256"></canvas>
+    <div class="label-row"><span>adaptive-monochrome</span><span>1024×1024</span></div>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button class="btn btn-primary" onclick="downloadAll()">⬇ 下载所有图标 (ZIP)</button>
+  <button class="btn btn-secondary" onclick="regenerate()">🔄 稍调配色重新生成</button>
+</div>
+<div id="status"></div>
+
+<script>
+// ── Design constants ──
+const PALETTES = [
+  { sky1: '#5B9BD5', sky2: '#7B6CF6', warm1: '#FF6B6B', warm2: '#F9A66C', sun: '#FFD93D', bg: '#E6F4FE', splashBg1: '#667eea', splashBg2: '#f5a3c7' },
+  { sky1: '#4A90D9', sky2: '#6C5CE7', warm1: '#E17055', warm2: '#FDCB6E', sun: '#F9CA24', bg: '#DFE6FD', splashBg1: '#5B6CDF', splashBg2: '#e8a0b4' },
+  { sky1: '#3B82C4', sky2: '#5B5E9F', warm1: '#D4594A', warm2: '#F7B963', sun: '#FFC312', bg: '#DCF0FA', splashBg1: '#4A5BCA', splashBg2: '#e098a8' },
+];
+let paletteIdx = 0;
+let colors = PALETTES[0];
+
+// ── Drawing helpers ──
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawCloudShape(ctx, cx, cy, scale) {
+  // A beautiful, modern cloud shape
+  ctx.beginPath();
+  const s = scale;
+  ctx.moveTo(cx - 140 * s, cy + 20 * s);
+  // bottom flat with slight curve
+  ctx.lineTo(cx + 140 * s, cy + 20 * s);
+  // right bumps
+  ctx.arc(cx + 120 * s, cy - 10 * s, 50 * s, 0.2, Math.PI * 0.65);
+  ctx.arc(cx + 40 * s, cy - 70 * s, 70 * s, 0, Math.PI * 0.8);
+  ctx.arc(cx - 50 * s, cy - 80 * s, 60 * s, 0, Math.PI * 0.9);
+  ctx.arc(cx - 120 * s, cy - 30 * s, 55 * s, 0.2, Math.PI * 0.7);
+  ctx.closePath();
+}
+
+function drawSparkle(ctx, cx, cy, size) {
+  // 4-point sparkle
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const r = i % 2 === 0 ? size : size * 0.35;
+    const angle = (i * Math.PI) / 4 - Math.PI / 2;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSunRays(ctx, cx, cy, outerR, innerR, count) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+    const x1 = Math.cos(angle) * innerR;
+    const y1 = Math.sin(angle) * innerR;
+    const x2 = Math.cos(angle) * outerR;
+    const y2 = Math.sin(angle) * outerR;
+    const xm = Math.cos(angle + 0.06) * outerR * 0.98;
+    const ym = Math.sin(angle + 0.06) * outerR * 0.98;
+    if (i === 0) ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(xm, ym);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── Draw app icon (roundrect style) ──
+function drawAppIcon(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+  const s = size / 1024;
+
+  // Background - rounded square with gradient
+  ctx.save();
+  roundRect(ctx, 0, 0, size, size, size * 0.22);
+  ctx.clip();
+  const bgGrad = ctx.createLinearGradient(0, 0, size, size);
+  bgGrad.addColorStop(0, colors.sky1);
+  bgGrad.addColorStop(0.5, colors.sky2);
+  bgGrad.addColorStop(1, colors.warm1);
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle atmospheric glow
+  const glowGrad = ctx.createRadialGradient(size * 0.38, size * 0.35, 0, size * 0.5, size * 0.5, size * 0.75);
+  glowGrad.addColorStop(0, 'rgba(255,255,255,0.28)');
+  glowGrad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+  glowGrad.addColorStop(1, 'rgba(0,0,0,0.05)');
+  ctx.fillStyle = glowGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Cloud shape
+  const cloudGrad = ctx.createLinearGradient(size * 0.25, size * 0.35, size * 0.75, size * 0.65);
+  cloudGrad.addColorStop(0, 'rgba(255,255,255,0.92)');
+  cloudGrad.addColorStop(0.5, 'rgba(255,255,255,0.78)');
+  cloudGrad.addColorStop(1, 'rgba(255,255,255,0.60)');
+  ctx.fillStyle = cloudGrad;
+  drawCloudShape(ctx, size * 0.5, size * 0.42, s);
+
+  // Subtle cloud shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.12)';
+  ctx.shadowBlur = size * 0.06;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = size * 0.02;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // Sun/mood element inside cloud
+  const sunCx = size * 0.48;
+  const sunCy = size * 0.44;
+  const sunR = size * 0.1;
+
+  // Sun rays
+  ctx.fillStyle = colors.sun + '55';
+  drawSunRays(ctx, sunCx, sunCy, sunR * 1.55, sunR * 1.08, 14);
+
+  // Sun circle
+  const sunGrad = ctx.createRadialGradient(sunCx - sunR * 0.25, sunCy - sunR * 0.3, sunR * 0.1, sunCx, sunCy, sunR);
+  sunGrad.addColorStop(0, '#FFFBE6');
+  sunGrad.addColorStop(0.5, colors.sun);
+  sunGrad.addColorStop(1, colors.warm2);
+  ctx.fillStyle = sunGrad;
+  ctx.beginPath();
+  ctx.arc(sunCx, sunCy, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small sparkle accents
+  ctx.fillStyle = '#FFFFFF';
+  drawSparkle(ctx, size * 0.32, size * 0.33, size * 0.028);
+  ctx.fillStyle = '#FFFFFFDD';
+  drawSparkle(ctx, size * 0.68, size * 0.58, size * 0.02);
+  drawSparkle(ctx, size * 0.40, size * 0.62, size * 0.016);
+
+  ctx.restore();
+
+  // Border
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = size * 0.008;
+  roundRect(ctx, 0, 0, size, size, size * 0.22);
+  ctx.stroke();
+}
+
+// ── Draw splash screen icon (centered logo mark, no bg) ──
+function drawSplashIcon(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+  const s = size / 1024;
+
+  // Transparent background
+  ctx.clearRect(0, 0, size, size);
+
+  // Soft radial glow behind cloud
+  const glowGrad = ctx.createRadialGradient(size * 0.5, size * 0.42, 0, size * 0.5, size * 0.42, size * 0.52);
+  glowGrad.addColorStop(0, 'rgba(255,255,255,0.55)');
+  glowGrad.addColorStop(0.5, 'rgba(200,210,255,0.2)');
+  glowGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(size * 0.5, size * 0.42, size * 0.52, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cloud
+  const cloudGrad = ctx.createLinearGradient(size * 0.25, size * 0.35, size * 0.75, size * 0.65);
+  cloudGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+  cloudGrad.addColorStop(0.5, 'rgba(255,255,255,0.80)');
+  cloudGrad.addColorStop(1, 'rgba(255,255,255,0.55)');
+  ctx.fillStyle = cloudGrad;
+  drawCloudShape(ctx, size * 0.5, size * 0.4, s);
+  ctx.shadowColor = 'rgba(0,0,0,0.1)';
+  ctx.shadowBlur = size * 0.04;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = size * 0.02;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // Sun element
+  const sunCx = size * 0.47;
+  const sunCy = size * 0.42;
+  const sunR = size * 0.12;
+  ctx.fillStyle = colors.sun + '44';
+  drawSunRays(ctx, sunCx, sunCy, sunR * 1.6, sunR * 1.1, 16);
+  const sunGrad = ctx.createRadialGradient(sunCx - sunR * 0.2, sunCy - sunR * 0.25, sunR * 0.08, sunCx, sunCy, sunR);
+  sunGrad.addColorStop(0, '#FFFEF5');
+  sunGrad.addColorStop(0.4, colors.sun);
+  sunGrad.addColorStop(1, colors.warm2);
+  ctx.fillStyle = sunGrad;
+  ctx.beginPath();
+  ctx.arc(sunCx, sunCy, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sparkles
+  ctx.fillStyle = '#FFFFFF';
+  drawSparkle(ctx, size * 0.34, size * 0.30, size * 0.032);
+  ctx.fillStyle = '#FFFFFFEE';
+  drawSparkle(ctx, size * 0.70, size * 0.56, size * 0.024);
+  drawSparkle(ctx, size * 0.36, size * 0.64, size * 0.018);
+}
+
+// ── Draw Android adaptive foreground ──
+function drawAdaptiveForeground(canvas, size) {
+  // Same as icon but with safe padding for adaptive icon mask
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+  const s = size / 1024;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Cloud centered in safe zone (inner 66% for adaptive icons)
+  const pad = size * 0.17;
+  const innerSize = size - pad * 2;
+  const is = innerSize / 1024;
+
+  // Glow
+  const cx = size * 0.5;
+  const cy = size * 0.42;
+  const glowGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerSize * 0.54);
+  glowGrad.addColorStop(0, 'rgba(255,255,255,0.5)');
+  glowGrad.addColorStop(0.5, 'rgba(200,210,255,0.18)');
+  glowGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerSize * 0.54, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cloud with adjusted scale
+  const cloudGrad = ctx.createLinearGradient(cx - innerSize * 0.28, cy - innerSize * 0.2, cx + innerSize * 0.28, cy + innerSize * 0.25);
+  cloudGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+  cloudGrad.addColorStop(0.5, 'rgba(255,255,255,0.82)');
+  cloudGrad.addColorStop(1, 'rgba(255,255,255,0.58)');
+  ctx.fillStyle = cloudGrad;
+  drawCloudShape(ctx, cx, cy, is * 0.82);
+  ctx.shadowColor = 'rgba(0,0,0,0.1)';
+  ctx.shadowBlur = innerSize * 0.045;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = innerSize * 0.025;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // Sun
+  const sunCx = cx - innerSize * 0.03;
+  const sunCy = cy;
+  const sunR = innerSize * 0.12;
+  ctx.fillStyle = colors.sun + '44';
+  drawSunRays(ctx, sunCx, sunCy, sunR * 1.6, sunR * 1.1, 16);
+  const sunGrad = ctx.createRadialGradient(sunCx - sunR * 0.2, sunCy - sunR * 0.25, sunR * 0.08, sunCx, sunCy, sunR);
+  sunGrad.addColorStop(0, '#FFFEF5');
+  sunGrad.addColorStop(0.4, colors.sun);
+  sunGrad.addColorStop(1, colors.warm2);
+  ctx.fillStyle = sunGrad;
+  ctx.beginPath();
+  ctx.arc(sunCx, sunCy, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sparkles scaled to safe zone
+  ctx.fillStyle = '#FFFFFF';
+  drawSparkle(ctx, cx - innerSize * 0.16, cy - innerSize * 0.14, innerSize * 0.033);
+  ctx.fillStyle = '#FFFFFFEE';
+  drawSparkle(ctx, cx + innerSize * 0.22, cy + innerSize * 0.16, innerSize * 0.025);
+  drawSparkle(ctx, cx - innerSize * 0.14, cy + innerSize * 0.26, innerSize * 0.019);
+}
+
+// ── Draw Android monochrome (silhouette style) ──
+function drawMonochrome(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+  const s = size / 1024;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Pure white filled cloud + sun silhouette
+  const cx = size * 0.5;
+  const cy = size * 0.43;
+
+  ctx.fillStyle = '#FFFFFF';
+
+  // Cloud silhouette
+  drawCloudShape(ctx, cx, cy, s);
+
+  // Sun circle merged in
+  ctx.arc(cx - size * 0.02, cy + size * 0.015, size * 0.115, 0, Math.PI * 2);
+
+  // Sun rays
+  const sunCx = cx - size * 0.02;
+  const sunCy = cy + size * 0.015;
+  const sunR = size * 0.115;
+  drawSunRays(ctx, sunCx, sunCy, sunR * 1.6, sunR * 1.1, 14);
+
+  // Sparkle dots
+  ctx.beginPath();
+  ctx.arc(cx - size * 0.18, cy - size * 0.13, size * 0.04, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + size * 0.19, cy + size * 0.17, size * 0.028, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx - size * 0.1, cy + size * 0.23, size * 0.022, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ── Draw Android adaptive background (solid color + subtle pattern) ──
+function drawAdaptiveBg(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+
+  // Solid background color
+  ctx.fillStyle = colors.bg;
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle radial gradient for depth
+  const grad = ctx.createRadialGradient(size * 0.5, size * 0.5, 0, size * 0.5, size * 0.5, size * 0.7);
+  grad.addColorStop(0, 'rgba(255,255,255,0.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.03)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+}
+
+// ── Draw favicon ──
+function drawFavicon(canvas, size) {
+  // Simplified icon for small size
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+  const s = size / 96;
+
+  // Rounded square bg
+  ctx.save();
+  roundRect(ctx, 0, 0, size, size, size * 0.18);
+  ctx.clip();
+  const bgGrad = ctx.createLinearGradient(0, 0, size, size);
+  bgGrad.addColorStop(0, colors.sky1);
+  bgGrad.addColorStop(1, colors.warm1);
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Simplified cloud
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  const cx = size * 0.5;
+  const cy = size * 0.42;
+  ctx.beginPath();
+  ctx.arc(cx - 10 * s, cy + 8 * s, 14 * s, 0, Math.PI * 2);
+  ctx.arc(cx - 3 * s, cy - 2 * s, 20 * s, 0, Math.PI * 2);
+  ctx.arc(cx + 10 * s, cy + 3 * s, 16 * s, 0, Math.PI * 2);
+  ctx.arc(cx + 22 * s, cy + 12 * s, 11 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Simple sun dot
+  ctx.fillStyle = colors.sun;
+  ctx.beginPath();
+  ctx.arc(cx - 3 * s, cy + 5 * s, 9 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ── Render previews ──
+function renderPreviews() {
+  drawAppIcon(document.getElementById('previewIcon'), 256);
+  drawSplashIcon(document.getElementById('previewSplash'), 256);
+  drawAdaptiveForeground(document.getElementById('previewForeground'), 256);
+  drawMonochrome(document.getElementById('previewMono'), 256);
+}
+
+// ── Full-size rendering ──
+function renderFullSize(name) {
+  const map = {
+    'icon.png': { fn: drawAppIcon, size: 1024 },
+    'splash-icon.png': { fn: drawSplashIcon, size: 1024 },
+    'android-icon-foreground.png': { fn: drawAdaptiveForeground, size: 1024 },
+    'android-icon-background.png': { fn: drawAdaptiveBg, size: 1024 },
+    'android-icon-monochrome.png': { fn: drawMonochrome, size: 1024 },
+    'favicon.png': { fn: drawFavicon, size: 96 },
+  };
+  const spec = map[name];
+  const canvas = document.createElement('canvas');
+  spec.fn(canvas, spec.size);
+  return canvas;
+}
+
+// ── Download ──
+function downloadPNG(canvas, filename) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function downloadAll() {
+  const status = document.getElementById('status');
+  status.className = 'info';
+  status.textContent = '正在生成图标，请稍候...';
+
+  const files = [
+    'icon.png',
+    'splash-icon.png',
+    'android-icon-foreground.png',
+    'android-icon-background.png',
+    'android-icon-monochrome.png',
+    'favicon.png',
+  ];
+
+  // Small delay so UI updates
+  setTimeout(() => {
+    files.forEach(f => {
+      const canvas = renderFullSize(f);
+      downloadPNG(canvas, f);
+    });
+    status.className = 'success';
+    status.textContent = '✅ 下载完成！请将 PNG 文件替换到 assets/ 目录下。';
+  }, 150);
+}
+
+function regenerate() {
+  paletteIdx = (paletteIdx + 1) % PALETTES.length;
+  colors = PALETTES[paletteIdx];
+  renderPreviews();
+  const status = document.getElementById('status');
+  status.className = 'info';
+  status.textContent = `🎨 已切换配色方案 ${paletteIdx + 1}/${PALETTES.length}`;
+}
+
+// ── Init ──
+renderPreviews();
+</script>
+</body>
+</html>
