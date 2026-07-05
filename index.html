@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoodScaper - 每天一张天气氛围壁纸</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #F5F0E8;
+      color: #5C4F3C;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 480px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 80px 24px 60px;
+      background: linear-gradient(180deg, #ECE3D4 0%, #F5F0E8 100%);
+    }
+    .hero-emoji { font-size: 72px; margin-bottom: 20px; }
+    .hero h1 {
+      font-size: 32px; font-weight: 700; letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .hero .tagline {
+      font-size: 17px; color: #9B8C76; font-weight: 400;
+      margin-bottom: 8px;
+    }
+    .hero .sub {
+      font-size: 14px; color: #C4B8A8; margin-bottom: 32px;
+    }
+
+    /* Mockup */
+    .mockup-wrap {
+      display: flex; justify-content: center; gap: 16px;
+      margin-bottom: -60px; position: relative; z-index: 2;
+    }
+    .mockup {
+      width: 140px; height: 280px;
+      border-radius: 24px; overflow: hidden;
+      background: linear-gradient(160deg, #C4A882, #D4C4A8, #ECE3D4);
+      box-shadow: 0 20px 60px rgba(92,79,60,0.15);
+      display: flex; flex-direction: column;
+      justify-content: flex-end; padding: 16px;
+    }
+    .mockup.dark {
+      background: linear-gradient(160deg, #2A272E, #4A3F6B, #7A7682);
+    }
+    .mockup .m-time {
+      color: rgba(255,255,255,0.9); font-size: 28px;
+      font-weight: 200; letter-spacing: 2px;
+    }
+    .mockup .m-temp {
+      color: rgba(255,255,255,0.8); font-size: 36px;
+      font-weight: 200;
+    }
+    .mockup .m-text {
+      color: rgba(255,255,255,0.6); font-size: 11px;
+      margin-top: 4px;
+    }
+
+    /* Sections */
+    .section {
+      padding: 60px 0;
+      text-align: center;
+    }
+    .section-title {
+      font-size: 22px; font-weight: 700; margin-bottom: 8px;
+    }
+    .section-sub {
+      font-size: 14px; color: #9B8C76; margin-bottom: 32px;
+    }
+
+    /* Features */
+    .features {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; text-align: left;
+    }
+    .feature-card {
+      background: #FFF; border-radius: 16px; padding: 20px;
+    }
+    .feature-icon { font-size: 32px; margin-bottom: 8px; }
+    .feature-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .feature-desc { font-size: 12px; color: #9B8C76; line-height: 1.5; }
+
+    /* How it works */
+    .steps { text-align: left; }
+    .step {
+      display: flex; gap: 16px; align-items: flex-start;
+      padding: 20px 0; border-bottom: 1px solid #E0D8CC;
+    }
+    .step-num {
+      width: 40px; height: 40px; border-radius: 20px;
+      background: #5C4F3C; color: #FFF; font-size: 18px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .step-desc { font-size: 13px; color: #9B8C76; }
+
+    /* CTA */
+    .cta {
+      background: #5C4F3C; color: #FFF;
+      border-radius: 24px; padding: 40px 24px;
+      margin: 40px 0; text-align: center;
+    }
+    .cta h3 { font-size: 22px; margin-bottom: 8px; }
+    .cta p { font-size: 14px; opacity: 0.7; margin-bottom: 24px; }
+    .cta-btn {
+      display: inline-block; background: #FFF; color: #5C4F3C;
+      padding: 14px 40px; border-radius: 30px; font-size: 16px;
+      font-weight: 700; text-decoration: none;
+      margin: 0 6px 10px;
+    }
+    .cta-btn.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,0.5);
+      color: #FFF;
+    }
+
+    /* QR */
+    .qr-section { text-align: center; padding: 40px 0 60px; }
+    .qr-box {
+      display: inline-block; background: #FFF; padding: 20px;
+      border-radius: 20px;
+    }
+    .qr-box canvas { display: block; }
+
+    /* Footer */
+    footer {
+      text-align: center; padding: 40px 0;
+      font-size: 12px; color: #C4B8A8;
+      border-top: 1px solid #E0D8CC;
+    }
+    footer a { color: #9B8C76; text-decoration: none; }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .container { max-width: 600px; }
+      .mockup { width: 180px; height: 360px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="emoji hero-emoji">🌤️</div>
+  <h1>MoodScaper</h1>
+  <p class="tagline">每天一张天气氛围壁纸</p>
+  <p class="sub">手机屏幕从此有了情绪</p>
+  <div class="mockup-wrap">
+    <div class="mockup">
+      <div class="m-time">10:28</div>
+      <div class="m-temp">33°</div>
+      <div class="m-text">☀️ 多云 · 北京</div>
+    </div>
+    <div class="mockup dark">
+      <div class="m-time">19:42</div>
+      <div class="m-temp">22°</div>
+      <div class="m-text">🌧️ 小雨 · 上海</div>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+
+  <!-- 核心功能 -->
+  <section class="section">
+    <h2 class="section-title">换个天气，换个心情</h2>
+    <p class="section-sub">不只是天气预报——是每天解锁手机的第一眼惊喜</p>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <div class="feature-title">天气氛围主题</div>
+        <div class="feature-desc">根据实时天气自动生成配色和壁纸</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📷</div>
+        <div class="feature-title">高清壁纸库</div>
+        <div class="feature-desc">10大分类，海量Unsplash摄影作品</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <div class="feature-title">AI 独家生成</div>
+        <div class="feature-desc">每次都是AI原创，永不撞屏</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📤</div>
+        <div class="feature-title">上传你的壁纸</div>
+        <div class="feature-desc">小红书抖音存的图，一键变主题</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 三步走 -->
+  <section class="section">
+    <h2 class="section-title">三步开始</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">告诉我们的你的偏好</div>
+          <div class="step-desc">30秒完成，选你喜欢的色调和风格</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">获取当地天气</div>
+          <div class="step-desc">自动定位，实时同步天气变化</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">每天解锁新主题</div>
+          <div class="step-desc">早上拿起手机，今天的氛围已经就位</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta">
+    <h3>让手机屏幕活起来</h3>
+    <p>免费下载，Pro 年订阅仅需 ￥48/年</p>
+    <a href="https://expo.dev/artifacts/eas/fbKLoiAiiC_bSkbQTjKmoGvklc26KvAbmy1MkcwdE6M.apk" class="cta-btn">⬇️ 下载 Android 版</a>
+    <a href="#" class="cta-btn outline">🍎 App Store</a>
+  </div>
+
+  <!-- 二维码 -->
+  <div class="qr-section">
+    <p style="color:#9B8C76;font-size:13px;margin-bottom:16px;">📱 手机扫码下载</p>
+    <div class="qr-box">
+      <canvas id="qrcode" width="160" height="160"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>© 2026 MoodScaper · 每天一张天气氛围壁纸</p>
+  <p style="margin-top:4px;">
+    <a href="/privacy.html">隐私政策</a> · <a href="/terms.html">服务条款</a> · <a href="mailto:3403675331@qq.com">联系我们</a>
+  </p>
+</footer>
+
+<!-- 简易二维码生成（指向当前域名） -->
+<script>
+(function() {
+  var canvas = document.getElementById('qrcode');
+  var ctx = canvas.getContext('2d');
+  var url = window.location.href;
+  // 用 Google Charts API 生成二维码
+  var img = new Image();
+  img.onload = function() { ctx.drawImage(img, 0, 0, 160, 160); };
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(url);
+})();
+</script>
+
+</body>
+</html>
