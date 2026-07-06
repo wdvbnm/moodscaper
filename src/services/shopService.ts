@@ -3,8 +3,9 @@ const API_BASE = 'https://api.unsplash.com';
 
 export interface ShopWallpaper {
   id: string;
-  thumbUrl: string;
-  fullUrl: string;
+  thumbUrl: string;    // 网格小图 400x600
+  detailUrl: string;   // 详情中图 800x1200
+  downloadUrl: string; // 下载大图 1290x2796
   author: string;
   authorUrl: string;
 }
@@ -44,14 +45,18 @@ export async function fetchShopWallpapers(
       page: String(page),
       client_id: UNSPLASH_KEY,
     });
-    const resp = await fetch(`${API_BASE}/search/photos?${params}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const resp = await fetch(`${API_BASE}/search/photos?${params}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
     const data = await resp.json();
     const photos = data.results || [];
 
     return photos.map((p: any) => ({
       id: p.id,
       thumbUrl: `${p.urls.raw}&w=400&h=600&fit=crop&auto=format`,
-      fullUrl: `${p.urls.raw}&w=1290&h=2796&fit=crop&crop=entropy&auto=format`,
+      detailUrl: `${p.urls.raw}&w=360&h=780&fit=crop&auto=format`,
+      downloadUrl: `${p.urls.raw}&w=1290&h=2796&fit=crop&crop=entropy&auto=format`,
       author: p.user?.name || 'Unsplash',
       authorUrl: p.user?.links?.html || 'https://unsplash.com',
     }));
@@ -68,7 +73,8 @@ export async function fetchWallpaperDetail(photoId: string): Promise<ShopWallpap
     return {
       id: p.id,
       thumbUrl: `${p.urls.raw}&w=400&h=600&fit=crop&auto=format`,
-      fullUrl: `${p.urls.raw}&w=1290&h=2796&fit=crop&crop=entropy&auto=format`,
+      detailUrl: `${p.urls.raw}&w=360&h=780&fit=crop&auto=format`,
+      downloadUrl: `${p.urls.raw}&w=1290&h=2796&fit=crop&crop=entropy&auto=format`,
       author: p.user?.name || 'Unsplash',
       authorUrl: p.user?.links?.html || 'https://unsplash.com',
     };

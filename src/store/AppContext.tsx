@@ -4,6 +4,7 @@ import { UserPreferences, DailyTheme, WeatherMood, ThemeHistoryEntry, DEFAULT_PR
 import { getCurrentLocation } from '../services/locationService';
 import { fetchWeather } from '../services/weatherService';
 import { generateDailyTheme } from '../services/atmosphereEngine';
+import { registerWallpaperTask, unregisterWallpaperTask } from '../services/backgroundTaskService';
 
 const PREFS_KEY = '@moodscaper_preferences';
 const THEME_KEY = '@moodscaper_today_theme';
@@ -83,6 +84,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  // 每日自动壁纸开关 → 注册/注销后台任务
+  useEffect(() => {
+    if (preferences.autoWallpaperEnabled) {
+      registerWallpaperTask();
+    } else {
+      unregisterWallpaperTask();
+    }
+  }, [preferences.autoWallpaperEnabled]);
 
   const loadData = async () => {
     try {

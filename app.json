@@ -27,7 +27,9 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SET_WALLPAPER"
       ]
     },
     "web": {
@@ -46,7 +48,9 @@
       [
         "expo-task-manager",
         {}
-      ]
+      ],
+      "react-native-nitro-wallpaper",
+      "expo-background-task"
     ],
     "extra": {
       "eas": {
@@ -54,6 +58,12 @@
       }
     },
     "privacy": "https://wdvbnm.github.io/moodscaper/privacy.html",
-    "owner": "waddefj"
+    "owner": "waddefj",
+    "updates": {
+      "url": "https://u.expo.dev/a50e29e3-ebab-477a-919b-ba8feb04cf1c",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": "1.0.0"
   }
 }

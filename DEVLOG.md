@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-07-06
+
+### ⏰ 每日自动换壁纸后台任务
+
+**新增文件：**
+- `src/services/backgroundTaskService.ts` — 后台任务定义 + 注册/注销 API
+
+**修改文件：**
+| 文件 | 改动 |
+|------|------|
+| `app.json` | 添加 `expo-background-task` 插件 + `RECEIVE_BOOT_COMPLETED` + `SET_WALLPAPER` 权限 |
+| `package.json` | 新增 `expo-background-task` 依赖 |
+| `src/types/index.ts` | `UserPreferences` 加 `autoWallpaperEnabled: boolean` |
+| `src/store/AppContext.tsx` | 导入 register/unregister，新增 useEffect 根据偏好开关任务 |
+| `src/screens/SettingsScreen.tsx` | 新增「每日自动壁纸」Section，Switch 开关 + DEV 测试按钮 |
+| `index.ts` | 导入 backgroundTaskService 确保模块级 TaskManager.defineTask 在 React 挂载前执行 |
+
+**技术方案：**
+- 使用 `expo-background-task`（替代已废弃的 expo-background-fetch）
+- Android 底层 WorkManager，iOS 底层 BGTaskScheduler
+- **早间守门模式**：任务每 ~15 分钟触发，仅在 6:00-10:00 AM 且当天未执行时跑完整流水线
+- 流水线：定位 → 天气 → 生成主题 → 缓存主题 → Picsum CDN 下载 → `WallpaperSet.setWallpaper()`（仅 Android）
+- iOS 只缓存主题到 AsyncStorage（不能自动设壁纸）
+
+**容错设计：**
+- 天气 API 失败 → fallback 默认多云天气
+- 定位失败 → fallback 上海
+- 壁纸下载 → Picsum CDN 不会失败
+- `react-native-nitro-wallpaper` 失败 → 非致命，主题仍被缓存
+- 所有异常被 catch 返回 `BackgroundTaskResult.Failed`
+
+**边界情况处理：**
+- 同一天多次触发 → `LAST_DATE_KEY` 幂等拦截
+- 6-10 AM 之外触发 → 立即返回 Success，不消耗资源
+- 用户关闭开关 → `unregisterWallpaperTask()` 注销 WorkManager 任务
+- 设备重启 → WorkManager 自动恢复（`RECEIVE_BOOT_COMPLETED` 权限）
+
+---
+
 ## 2026-07-05
 
 ### 🖼️ 一键设壁纸 — Android 全自动 + iOS 引导

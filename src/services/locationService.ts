@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import * as Location from 'expo-location';
 
 export interface LocationResult {
   latitude: number;
@@ -13,25 +12,43 @@ export async function getCurrentLocation(): Promise<LocationResult> {
     return getWebLocation();
   }
 
-  // 原生端：使用 expo-location
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') {
-    throw new Error('需要定位权限才能获取当地天气，为您生成今天的氛围主题');
+  // 原生端：使用 expo-location（加超时兜底）
+  try {
+    const Location = require('expo-location');
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      // 权限被拒，用默认城市
+      return {
+        latitude: 31.2304,
+        longitude: 121.4737,
+        city: '上海',
+      };
+    }
+
+    // 8 秒超时，避免 GPS 卡死
+    const location = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('定位超时')), 8000)),
+    ]);
+
+    const { latitude, longitude } = location.coords;
+
+    // 逆地理编码也加超时
+    const geocode = await Promise.race([
+      Location.reverseGeocodeAsync({ latitude, longitude }),
+      new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('地理编码超时')), 5000)),
+    ]);
+
+    const city = geocode[0]?.city || geocode[0]?.district || geocode[0]?.region || '未知城市';
+    return { latitude, longitude, city };
+  } catch {
+    // 任何异常都用默认值
+    return {
+      latitude: 31.2304,
+      longitude: 121.4737,
+      city: '上海',
+    };
   }
-
-  const location = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
-
-  const { latitude, longitude } = location.coords;
-  const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-  const city =
-    geocode[0]?.city ||
-    geocode[0]?.district ||
-    geocode[0]?.region ||
-    '未知城市';
-
-  return { latitude, longitude, city };
 }
 
 // Web 端定位（浏览器原生 Geolocation API + fetch 反地理编码）

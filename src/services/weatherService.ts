@@ -37,9 +37,15 @@ export async function fetchWeather(location: LocationResult): Promise<WeatherDat
   const { latitude, longitude, city } = location;
 
   try {
+    // 8 秒超时，避免网络卡死
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(
-      `${BASE_URL}/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric&lang=zh_cn`
+      `${BASE_URL}/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric&lang=zh_cn`,
+      { signal: controller.signal }
     );
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`天气API请求失败: ${response.status}`);

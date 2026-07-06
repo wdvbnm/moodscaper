@@ -40,6 +40,7 @@ export interface UserPreferences {
   themeMode: ThemeMode;
   completedOnboarding: boolean;
   customMoods: Record<WeatherType, string>;  // Pro 用户自写文案
+  autoWallpaperEnabled: boolean;
 }
 
 export interface ThemeHistoryEntry {
@@ -80,6 +81,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
     windy: '',
   },
   completedOnboarding: false,
+  autoWallpaperEnabled: false,
 };
 
 // ===== 主题 =====

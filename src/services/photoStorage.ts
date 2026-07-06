@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 
 const PHOTOS_KEY = '@moodscaper_user_photos';
 const CURRENT_PHOTO_KEY = '@moodscaper_current_custom_photo';
@@ -106,6 +105,7 @@ export async function pickImage(): Promise<File | null> {
   }
   // 原生端用 expo-image-picker
   try {
+    const ImagePicker = require('expo-image-picker');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,

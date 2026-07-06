@@ -126,6 +126,51 @@ export default function SettingsScreen({ onGoPro, onGoPhotos }: { onGoPro?: () =
         </View>
       </View>
 
+      {/* 每日自动壁纸 */}
+      <Section title="每日自动壁纸">
+        <View style={styles.autoWallpaperRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.autoWallpaperLabel}>自动设置壁纸</Text>
+            <Text style={styles.autoWallpaperDesc}>
+              {Platform.OS === 'android'
+                ? '每天早上 6-10 点自动更新桌面壁纸'
+                : '每天早上自动缓存天气主题，打开 App 即可看到'}
+            </Text>
+          </View>
+          <Switch
+            value={preferences.autoWallpaperEnabled ?? false}
+            onValueChange={(v) => {
+              updatePreferences({ autoWallpaperEnabled: v } as any);
+              if (v && Platform.OS === 'android') {
+                Alert.alert(
+                  '省电提示',
+                  '部分手机厂商的省电策略可能会延迟后台更新。\n\n建议：在系统设置中关闭 MoodScaper 的电池优化。',
+                  [{ text: '知道了' }]
+                );
+              }
+            }}
+            trackColor={{ false: '#DDD', true: '#5C4F3C' }}
+            thumbColor={preferences.autoWallpaperEnabled ? '#FFF' : '#F5F0E8'}
+          />
+        </View>
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devTestBtn}
+            onPress={async () => {
+              try {
+                const BgTask = require('expo-background-task');
+                await BgTask.triggerTaskWorkerForTestingAsync();
+                Alert.alert('已触发', '后台任务已手动触发，请检查控制台输出。\n\n如壁纸已更换则表示流水线正常。');
+              } catch (e: any) {
+                Alert.alert('触发失败', e.message);
+              }
+            }}
+          >
+            <Text style={styles.devTestBtnText}>[DEV] 手动触发后台任务</Text>
+          </TouchableOpacity>
+        )}
+      </Section>
+
       {/* 邀请好友 */}
       <Section title="邀请好友">
         <View style={styles.referralBox}>
@@ -749,4 +794,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 20,
   },
+
+  // 每日自动壁纸
+  autoWallpaperRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFF', padding: 16, borderRadius: 12,
+  },
+  autoWallpaperLabel: { fontSize: 15, fontWeight: '500', color: '#5C4F3C', marginBottom: 4 },
+  autoWallpaperDesc: { fontSize: 12, color: '#9B8C76', lineHeight: 18 },
+  devTestBtn: {
+    padding: 12, marginTop: 8, backgroundColor: '#F0E8D8',
+    borderRadius: 8, alignItems: 'center' as const,
+  },
+  devTestBtnText: { color: '#5C4F3C', fontSize: 13 },
 });

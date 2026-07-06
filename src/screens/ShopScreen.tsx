@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Dimensions, FlatList,
+  ActivityIndicator, Dimensions, FlatList, Image, Alert, Platform,
 } from 'react-native';
 import {
   CATEGORIES, ShopCategory, ShopWallpaper,
   fetchShopWallpapers,
 } from '../services/shopService';
-import { downloadWallpaper } from '../services/wallpaperGenerator';
 import { useMembership, PRO_ONLY_CATEGORIES } from '../store/MembershipContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -41,7 +40,6 @@ export default function ShopScreen() {
   }, [activeCategory]);
 
   const handleCategoryChange = (cat: ShopCategory) => {
-    // Pro 分类检查
     if (PRO_ONLY_CATEGORIES.includes(cat.key) && !isPro) {
       setShowProModal(true);
       return;
@@ -49,7 +47,6 @@ export default function ShopScreen() {
     setActiveCategory(cat);
   };
 
-  // 是否锁定当前分类
   const isLocked = PRO_ONLY_CATEGORIES.includes(activeCategory.key) && !isPro;
 
   const handleLoadMore = () => {
@@ -67,7 +64,6 @@ export default function ShopScreen() {
     setSelectedWallpaper(null);
   };
 
-  // 详情弹窗
   if (selectedWallpaper) {
     return (
       <WallpaperDetail
@@ -79,14 +75,18 @@ export default function ShopScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 分类标签 */}
       <View style={styles.categoryBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {CATEGORIES.map((cat) => {
+        <FlatList
+          data={CATEGORIES}
+          keyExtractor={(cat) => cat.key}
+          numColumns={2}
+          scrollEnabled={false}
+          contentContainerStyle={styles.categoryGrid}
+          columnWrapperStyle={{ gap: 8 }}
+          renderItem={({ item: cat }) => {
             const locked = PRO_ONLY_CATEGORIES.includes(cat.key) && !isPro;
             return (
               <TouchableOpacity
-                key={cat.key}
                 style={[
                   styles.categoryChip,
                   activeCategory.key === cat.key && styles.categoryChipActive,
@@ -101,17 +101,17 @@ export default function ShopScreen() {
                     activeCategory.key === cat.key && styles.categoryLabelActive,
                     locked && styles.categoryLabelLocked,
                   ]}
+                  numberOfLines={1}
                 >
                   {cat.label}
                 </Text>
                 {locked && <Text style={styles.proBadge}>PRO</Text>}
               </TouchableOpacity>
             );
-          })}
-        </ScrollView>
+          }}
+        />
       </View>
 
-      {/* Pro 升级提示弹窗 */}
       {showProModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -131,7 +131,6 @@ export default function ShopScreen() {
         </View>
       )}
 
-      {/* 壁纸网格 */}
       <FlatList
         data={wallpapers}
         keyExtractor={(item) => item.id}
@@ -146,11 +145,10 @@ export default function ShopScreen() {
             onPress={() => handleWallpaperTap(item)}
             activeOpacity={0.9}
           >
-            <img
-              src={item.thumbUrl}
-              alt={item.author}
+            <Image
+              source={{ uri: item.thumbUrl }}
               style={styles.gridImage}
-              loading="lazy"
+              resizeMode="cover"
             />
             <View style={styles.gridOverlay}>
               <Text style={styles.gridAuthor} numberOfLines={1}>{item.author}</Text>
@@ -182,35 +180,53 @@ function WallpaperDetail({
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject();
-        img.src = wallpaper.fullUrl;
-      });
+      if (Platform.OS === 'web') {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject();
+          img.src = wallpaper.downloadUrl;
+        });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 1290;
-      canvas.height = 2796;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, 1290, 2796);
+        const canvas = document.createElement('canvas');
+        canvas.width = 1290;
+        canvas.height = 2796;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, 1290, 2796);
 
-      // 简单的暗角
-      const v = ctx.createRadialGradient(645, 1398, 900, 645, 1398, 2000);
-      v.addColorStop(0, 'transparent');
-      v.addColorStop(1, 'rgba(0,0,0,0.15)');
-      ctx.fillStyle = v;
-      ctx.fillRect(0, 0, 1290, 2796);
+        const v = ctx.createRadialGradient(645, 1398, 900, 645, 1398, 2000);
+        v.addColorStop(0, 'transparent');
+        v.addColorStop(1, 'rgba(0,0,0,0.15)');
+        ctx.fillStyle = v;
+        ctx.fillRect(0, 0, 1290, 2796);
 
-      const url = canvas.toDataURL('image/png');
-      downloadWallpaper(url, `moodscaper-${wallpaper.id}.png`);
-    } catch (e) {
-      // 直接下载原图
-      const link = document.createElement('a');
-      link.download = `moodscaper-${wallpaper.id}.jpg`;
-      link.href = wallpaper.fullUrl;
-      link.click();
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `moodscaper-${wallpaper.id}.png`;
+        link.href = url;
+        link.click();
+      } else {
+        const FileSystem = require('expo-file-system');
+        const MediaLibrary = require('expo-media-library');
+        const Sharing = require('expo-sharing');
+
+        const filename = `moodscaper-${wallpaper.id}.jpg`;
+        const fileUri = FileSystem.cacheDirectory + filename;
+        const { uri } = await FileSystem.downloadAsync(wallpaper.downloadUrl, fileUri);
+
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(uri);
+          Alert.alert('已保存', '壁纸已保存到相册');
+        } else if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri);
+        } else {
+          Alert.alert('提示', '请在设置中允许相册权限');
+        }
+      }
+    } catch (e: any) {
+      Alert.alert('下载失败', e.message || '请稍后重试');
     } finally {
       setDownloading(false);
     }
@@ -218,14 +234,12 @@ function WallpaperDetail({
 
   return (
     <View style={styles.detailContainer}>
-      {/* 大图 */}
-      <img
-        src={wallpaper.fullUrl}
-        alt="壁纸预览"
+      <Image
+        source={{ uri: wallpaper.detailUrl }}
         style={styles.detailImage}
+        resizeMode="contain"
       />
 
-      {/* 底部信息栏 */}
       <View style={styles.detailBar}>
         <TouchableOpacity style={styles.detailClose} onPress={onClose}>
           <Text style={styles.detailCloseText}>✕</Text>
@@ -254,17 +268,21 @@ function WallpaperDetail({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F0E8' },
   categoryBar: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     backgroundColor: '#F5F0E8',
   },
+  categoryGrid: {
+    gap: 8,
+  },
   categoryChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 20,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
     backgroundColor: '#FFF',
   },
   categoryChipActive: { backgroundColor: '#5C4F3C' },
@@ -277,8 +295,6 @@ const styles = StyleSheet.create({
     fontSize: 9, fontWeight: '800', color: '#D4A84B',
     marginLeft: 4, letterSpacing: 0.5,
   },
-
-  // Pro 弹窗
   modalOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -310,7 +326,6 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
   },
   gridOverlay: {
     position: 'absolute',
@@ -320,13 +335,10 @@ const styles = StyleSheet.create({
   },
   gridAuthor: { color: '#FFF', fontSize: 11 },
   footer: { paddingVertical: 20, alignItems: 'center' },
-
-  // Detail
   detailContainer: { flex: 1, backgroundColor: '#000' },
   detailImage: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    objectFit: 'contain',
   },
   detailBar: {
     position: 'absolute',

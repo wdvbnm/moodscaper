@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 
 const W = 1290;
 const H = 2796;
+const PREVIEW_W = 360;
+const PREVIEW_H = 780;
 const UNSPLASH_KEY = 'QPlyeu1KsheWanIvZTkei3-18FyDmkbNdIYiB-GfxWQ';
 
 // ===== Unsplash 搜索词（匹配小红书抖音爆款风格） =====
@@ -40,7 +42,10 @@ async function fetchUnsplashUrl(weatherType: WeatherType, seed: number): Promise
   const queries = SEARCH_MAP[weatherType] || SEARCH_MAP['partly-cloudy'];
   const query = queries[seed % queries.length];
   try {
-    const resp = await fetch(`https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=portrait&count=1&client_id=${UNSPLASH_KEY}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(`https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=portrait&count=1&client_id=${UNSPLASH_KEY}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
     const data = await resp.json();
     const photo = Array.isArray(data) ? data[0] : data;
     if (photo?.urls?.full) return photo.urls.full;
@@ -50,12 +55,30 @@ async function fetchUnsplashUrl(weatherType: WeatherType, seed: number): Promise
 
 // ===== 公开接口 =====
 
-// 壁纸预览 URL（Unsplash 为主，快速加载）
-export async function getWallpaperPreviewUrl(weatherType: WeatherType, seed: number): Promise<string> {
-  const url = await fetchUnsplashUrl(weatherType, seed);
-  if (url) return url;
-  // 兜底 Picsum
-  return `https://picsum.photos/seed/${seed}/${W}/${H}`;
+// 壁纸预览 URL：先立即返回 Picsum（稳定、CDN 全球覆盖），后台尝试 Unsplash 替换
+// 预览用小尺寸（640x1386），文件小 4-8 倍，秒加载
+export async function getWallpaperPreviewUrl(
+  weatherType: WeatherType,
+  seed: number
+): Promise<{ primary: string; enhanced: Promise<string | null>; downloadUrl: string }> {
+  // 主 URL：Picsum 小尺寸预览，立即可用
+  const primary = `https://picsum.photos/seed/${weatherType}${seed}/${PREVIEW_W}/${PREVIEW_H}`;
+  // 下载用大尺寸
+  const downloadUrl = `https://picsum.photos/seed/${weatherType}${seed}/${W}/${H}`;
+
+  // 增强 URL：Unsplash 小尺寸，后台异步加载
+  const enhanced = fetchUnsplashUrl(weatherType, seed).then((unsplashFull) => {
+    if (!unsplashFull) return null;
+    // Unsplash 支持 &w= 参数缩放，把大图 URL 改成小尺寸
+    return unsplashFull.replace(/&w=\d+/g, '') + `&w=${PREVIEW_W}`;
+  });
+
+  return { primary, enhanced, downloadUrl };
+}
+
+// 获取下载用大图 URL
+export function getWallpaperDownloadUrl(weatherType: WeatherType, seed: number): string {
+  return `https://picsum.photos/seed/${weatherType}${seed}/${W}/${H}`;
 }
 
 // AI 生成壁纸 URL（慢但独特）
@@ -71,8 +94,11 @@ export async function generateWallpaperImage(theme: DailyTheme): Promise<string>
 }
 
 export function downloadWallpaper(dataUrl: string, filename: string) {
-  const link = document.createElement('a');
-  link.download = filename;
-  link.href = dataUrl;
-  link.click();
+  if (Platform.OS === 'web') {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    link.click();
+  }
+  // 原生端下载由调用方通过 expo-file-system + expo-media-library 处理
 }

@@ -1,7 +1,5 @@
 import { Alert, Platform } from 'react-native';
 import { DailyTheme } from '../types';
-import * as MediaLibrary from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
 
 export async function saveWallpaperToGallery(theme: DailyTheme): Promise<boolean> {
   // Web 端：直接弹提示
@@ -16,6 +14,7 @@ export async function saveWallpaperToGallery(theme: DailyTheme): Promise<boolean
 
   try {
     // 原生端：请求相册权限
+    const MediaLibrary = require('expo-media-library');
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('需要相册权限', '请在系统设置中允许 MoodScaper 访问相册。');
@@ -64,6 +63,7 @@ export async function shareThemeCard(theme: DailyTheme): Promise<void> {
   }
 
   try {
+    const Sharing = require('expo-sharing');
     if (await Sharing.isAvailableAsync()) {
       const shareText = [
         `🌤️ MoodScaper · 今日氛围`,
