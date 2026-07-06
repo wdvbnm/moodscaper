@@ -34,10 +34,9 @@ function mapWeatherCode(code: number): WeatherType {
 }
 
 export async function fetchWeather(location: LocationResult): Promise<WeatherData> {
-  const { latitude, longitude, city } = location;
+  const { latitude, longitude } = location;
 
   try {
-    // 8 秒超时，避免网络卡死
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
@@ -56,6 +55,8 @@ export async function fetchWeather(location: LocationResult): Promise<WeatherDat
     const weatherType = mapWeatherCode(data.weather[0].id);
     const now = new Date();
     const season = getSeason(now.getMonth() + 1);
+    // 城市名直接用天气 API 返回的 name（国内可用，无需单独反地理编码）
+    const city = data.name || '未知城市';
 
     return {
       weatherType,
@@ -68,7 +69,6 @@ export async function fetchWeather(location: LocationResult): Promise<WeatherDat
       sunset: data.sys.sunset,
     };
   } catch (error) {
-    // 网络失败时返回默认天气数据，确保 App 仍能展示主题
     console.warn('天气API请求失败，使用默认数据:', error);
     const now = new Date();
     return {
@@ -76,7 +76,7 @@ export async function fetchWeather(location: LocationResult): Promise<WeatherDat
       temperature: 22,
       humidity: 55,
       description: '多云',
-      city,
+      city: '未知城市',
       season: getSeason(now.getMonth() + 1),
       sunrise: 0,
       sunset: 0,
