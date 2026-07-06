@@ -117,10 +117,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (storedTheme) {
         const theme: DailyTheme = JSON.parse(storedTheme);
         if (theme.date === dateKey) {
-          // 今天的主题已生成过，直接用
-          setTodayTheme(theme);
-          setIsLoading(false);
-          return;
+          // 如果缓存的日期是今天，但城市名是旧版默认值，说明需要重新获取
+          const isStaleCity = theme.city === '上海' || theme.city === '未知城市' || !theme.city;
+          if (!isStaleCity) {
+            // 今天的主题已生成过，直接用
+            setTodayTheme(theme);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
