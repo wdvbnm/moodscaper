@@ -34,9 +34,12 @@ export async function getCurrentLocation(): Promise<LocationResult> {
     const { status } = await Location.requestForegroundPermissionsAsync();
 
     if (status === 'granted') {
-      // 优先用上次已知位置（毫秒级，Android 几乎总是有）
+      // 优先用上次已知位置（加超时，防止挂起）
       try {
-        const lastKnown = await Location.getLastKnownPositionAsync();
+        const lastKnown = await Promise.race([
+          Location.getLastKnownPositionAsync(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+        ]);
         if (lastKnown && lastKnown.coords) {
           return {
             latitude: lastKnown.coords.latitude,
@@ -45,7 +48,7 @@ export async function getCurrentLocation(): Promise<LocationResult> {
           };
         }
       } catch {
-        // lastKnown 失败，继续尝试实时定位
+        // lastKnown 超时或失败，继续尝试实时定位
       }
 
       // 实时 GPS（15 秒超时）
