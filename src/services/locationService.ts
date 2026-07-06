@@ -6,18 +6,38 @@ export interface LocationResult {
   city: string;
 }
 
+// OpenWeatherMap 反地理编码（国内可用，不依赖 Google）
+async function reverseGeocodeViaOWM(lat: number, lon: number): Promise<string | null> {
+  try {
+    const API_KEY = 'c0a5c5ff8f3e93a10455cd7cf2ecf61a';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${API_KEY}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    const data = await resp.json();
+    if (data?.[0]) {
+      return data[0]?.local_names?.zh || data[0]?.name || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentLocation(): Promise<LocationResult> {
   // Web 端：使用浏览器 Geolocation API
   if (Platform.OS === 'web') {
     return getWebLocation();
   }
 
-  // 原生端：使用 expo-location（加超时兜底）
+  // 原生端：使用 expo-location + OWM 反地理编码（兼容国内网络）
   try {
     const Location = require('expo-location');
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      // 权限被拒，用默认城市
       return {
         latitude: 31.2304,
         longitude: 121.4737,
@@ -25,24 +45,36 @@ export async function getCurrentLocation(): Promise<LocationResult> {
       };
     }
 
-    // 8 秒超时，避免 GPS 卡死
+    // 10 秒超时，给 GPS 冷启动留足时间
     const location = await Promise.race([
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('定位超时')), 8000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('定位超时')), 10000)),
     ]);
 
     const { latitude, longitude } = location.coords;
 
-    // 逆地理编码也加超时
-    const geocode = await Promise.race([
-      Location.reverseGeocodeAsync({ latitude, longitude }),
-      new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('地理编码超时')), 5000)),
-    ]);
+    // 优先用 OpenWeatherMap 反地理编码（国内可用）
+    const owmCity = await reverseGeocodeViaOWM(latitude, longitude);
+    if (owmCity) {
+      return { latitude, longitude, city: owmCity };
+    }
 
-    const city = geocode[0]?.city || geocode[0]?.district || geocode[0]?.region || '未知城市';
-    return { latitude, longitude, city };
+    // OWM 失败时回退到 expo-location 的 reverseGeocodeAsync
+    try {
+      const geocode = await Promise.race([
+        Location.reverseGeocodeAsync({ latitude, longitude }),
+        new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('地理编码超时')), 5000)),
+      ]);
+      const city = geocode[0]?.city || geocode[0]?.district || geocode[0]?.subregion || geocode[0]?.region || '未知城市';
+      if (city !== '未知城市') {
+        return { latitude, longitude, city };
+      }
+    } catch {
+      // 回退也失败，继续到 fallback
+    }
+
+    return { latitude, longitude, city: '未知城市' };
   } catch {
-    // 任何异常都用默认值
     return {
       latitude: 31.2304,
       longitude: 121.4737,
