@@ -3,6 +3,31 @@
 > 项目：MoodScaper — 每天一张天气氛围壁纸
 > 技术栈：Expo SDK 57 · React Native 0.86 · React 19.2.3 · TypeScript 6.0.3
 > 仓库：`https://github.com/wdvbnm/moodscaper.git`
+
+---
+
+## 2026-07-06
+
+### 🔧 定位速度优化 & 城市名兜底
+
+**问题**：
+- "今日"界面加载慢（最长 20 秒 GPS 超时）
+- 城市名显示"未知城市"（天气 API 不返回城市名时无备选）
+
+**修改**：
+
+1. **`src/services/locationService.ts` — 翻转定位优先级**
+   - 旧流程：GPS（5s+15s）→ IP（5s）= 最长 ~25s
+   - 新流程：**IP 优先**（~2s）→ GPS 只作备选 = 通常 ~2s
+   - IP 定位现在也返回 `city` 字段（ipapi.co）
+
+2. **`src/services/weatherService.ts` — 城市名三级兜底**
+   - `data.name`（天气 API）→ `location.city`（IP 定位）→ `'未知城市'`
+
+3. **`src/store/AppContext.tsx` — 非阻塞加载**
+   - 旧：城市名不对时阻塞 UI 等待刷新
+   - 新：**先展示缓存主题**（即时），后台静默刷新城市名
+   - 用户打开应用即可看到内容，不再盯着 loading
 > 官网：`https://wdvbnm.github.io/moodscaper/` · `https://moodscaper-website.vercel.app`
 
 ---

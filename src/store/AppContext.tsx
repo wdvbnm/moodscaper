@@ -117,18 +117,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (storedTheme) {
         const theme: DailyTheme = JSON.parse(storedTheme);
         if (theme.date === dateKey) {
-          // 如果缓存的日期是今天，但城市名是旧版默认值，说明需要重新获取
+          // 先展示缓存（即使城市名不对），不阻塞 UI
+          setTodayTheme(theme);
+          setIsLoading(false);
+
+          // 如果城市名是旧版默认值，后台静默刷新
           const isStaleCity = theme.city === '上海' || theme.city === '未知城市' || !theme.city;
-          if (!isStaleCity) {
-            // 今天的主题已生成过，直接用
-            setTodayTheme(theme);
-            setIsLoading(false);
-            return;
+          if (isStaleCity) {
+            refreshTodayThemeInternal(userPrefs);
           }
+          return;
         }
       }
 
-      // 生成新主题
+      // 没有今日缓存，必须等待生成
       await refreshTodayThemeInternal(userPrefs);
     } catch (e: any) {
       setError(e.message || '加载失败');

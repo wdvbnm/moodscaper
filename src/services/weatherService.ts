@@ -56,7 +56,8 @@ export async function fetchWeather(location: LocationResult): Promise<WeatherDat
     const now = new Date();
     const season = getSeason(now.getMonth() + 1);
     // 城市名直接用天气 API 返回的 name（国内可用，无需单独反地理编码）
-    const city = data.name || '未知城市';
+    // 城市名优先级：天气 API > IP 定位 > 未知城市
+    const city = data.name || location.city || '未知城市';
 
     return {
       weatherType,

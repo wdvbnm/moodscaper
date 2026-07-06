@@ -3,10 +3,10 @@ import { Platform } from 'react-native';
 export interface LocationResult {
   latitude: number;
   longitude: number;
-  city: string;
+  city: string; // ipapi 返回的城市名，作为天气 API 的备选
 }
 
-// IP 定位兜底（不需要权限）
+// IP 定位优先（1-2 秒出结果，无需权限，省级精度够天气用）
 async function getIPLocation(): Promise<LocationResult | null> {
   try {
     const controller = new AbortController();
@@ -16,7 +16,11 @@ async function getIPLocation(): Promise<LocationResult | null> {
     if (!resp.ok) return null;
     const data = await resp.json();
     if (data?.latitude && data?.longitude) {
-      return { latitude: data.latitude, longitude: data.longitude, city: '' };
+      return {
+        latitude: data.latitude,
+        longitude: data.longitude,
+        city: data.city || '', // ipapi 的城市名
+      };
     }
     return null;
   } catch {
@@ -29,12 +33,17 @@ export async function getCurrentLocation(): Promise<LocationResult> {
     return getWebLocation();
   }
 
+  // 第 1 层：IP 定位（快，2 秒内出结果）
+  const ipLoc = await getIPLocation();
+  if (ipLoc) return ipLoc;
+
+  // 第 2 层：GPS（需要权限，室内可能慢）
   try {
     const Location = require('expo-location');
     const { status } = await Location.requestForegroundPermissionsAsync();
 
     if (status === 'granted') {
-      // 优先用上次已知位置（加超时，防止挂起）
+      // 2a. 上次已知位置（5 秒超时）
       try {
         const lastKnown = await Promise.race([
           Location.getLastKnownPositionAsync(),
@@ -47,15 +56,13 @@ export async function getCurrentLocation(): Promise<LocationResult> {
             city: '',
           };
         }
-      } catch {
-        // lastKnown 超时或失败，继续尝试实时定位
-      }
+      } catch { /* 超时或失败 */ }
 
-      // 实时 GPS（15 秒超时）
+      // 2b. 实时 GPS（10 秒超时，Balanced 精度室内也可能有结果）
       try {
         const pos = await Promise.race([
           Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
         ]);
         if (pos && pos.coords) {
           return {
@@ -64,21 +71,11 @@ export async function getCurrentLocation(): Promise<LocationResult> {
             city: '',
           };
         }
-      } catch {
-        // GPS 失败，继续下一层
-      }
+      } catch { /* 超时或失败 */ }
     }
+  } catch { /* expo-location 不可用 */ }
 
-    // IP 定位兜底
-    const ipLoc = await getIPLocation();
-    if (ipLoc) return ipLoc;
-  } catch {
-    // 整个 expo-location 不可用
-    const ipLoc = await getIPLocation();
-    if (ipLoc) return ipLoc;
-  }
-
-  // 最终兜底
+  // 最终兜底：上海
   return { latitude: 31.2304, longitude: 121.4737, city: '' };
 }
 
